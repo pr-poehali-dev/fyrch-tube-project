@@ -1,0 +1,23 @@
+{
+  "tests": [
+    {
+      "name": "Get videos list",
+      "method": "GET",
+      "path": "/?action=videos",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login user",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "login",
+        "username": "testuser",
+        "password": "testpass"
+      },
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

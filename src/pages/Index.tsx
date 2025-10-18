@@ -12,6 +12,7 @@ const API_URL = 'https://functions.poehali.dev/453139a2-6cbd-4623-a97e-53270c9c6
 interface User {
   id: number;
   username: string;
+  is_admin?: boolean;
 }
 
 interface Video {
@@ -186,6 +187,57 @@ const Index = () => {
     toast({ title: 'Вы вышли из аккаунта' });
   };
 
+  const handleDeleteVideo = async (videoId: number) => {
+    if (!user?.is_admin) return;
+    
+    try {
+      const res = await fetch(API_URL, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_video',
+          user_id: user.id,
+          video_id: videoId
+        })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setVideos(videos.filter(v => v.id !== videoId));
+        if (selectedVideo?.id === videoId) {
+          setSelectedVideo(null);
+        }
+        toast({ title: 'Видео удалено' });
+      }
+    } catch (err) {
+      toast({ title: 'Ошибка удаления', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!user?.is_admin) return;
+    
+    try {
+      const res = await fetch(API_URL, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_comment',
+          user_id: user.id,
+          comment_id: commentId
+        })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setComments(comments.filter(c => c.id !== commentId));
+        toast({ title: 'Комментарий удален' });
+      }
+    } catch (err) {
+      toast({ title: 'Ошибка удаления', variant: 'destructive' });
+    }
+  };
+
   const openVideo = (video: Video) => {
     setSelectedVideo(video);
     loadComments(video.id);
@@ -326,6 +378,15 @@ const Index = () => {
                     <Icon name="ThumbsDown" size={16} className="mr-1" />
                     {video.dislikes}
                   </Button>
+                  {user?.is_admin && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteVideo(video.id)}
+                    >
+                      <Icon name="Trash2" size={16} />
+                    </Button>
+                  )}
                 </div>
               </Card>
             ))}
@@ -389,9 +450,21 @@ const Index = () => {
 
                 <div className="space-y-3">
                   {comments.map((comment) => (
-                    <div key={comment.id} className="bg-muted p-3 rounded-lg">
-                      <p className="font-medium text-sm mb-1">@{comment.username}</p>
-                      <p className="text-sm">{comment.comment_text}</p>
+                    <div key={comment.id} className="bg-muted p-3 rounded-lg flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm mb-1">@{comment.username}</p>
+                        <p className="text-sm">{comment.comment_text}</p>
+                      </div>
+                      {user?.is_admin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="ml-2 text-destructive hover:text-destructive"
+                        >
+                          <Icon name="Trash2" size={16} />
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -8,13 +8,13 @@
       "bodyMatcher": "partial"
     },
     {
-      "name": "Login user",
+      "name": "Login admin",
       "method": "POST",
       "path": "/",
       "body": {
         "action": "login",
-        "username": "testuser",
-        "password": "testpass"
+        "username": "admin",
+        "password": "justpassword"
       },
       "expectedStatus": 200,
       "bodyMatcher": "partial"

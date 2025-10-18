@@ -34,7 +34,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
                 'Access-Control-Max-Age': '86400'
             },
@@ -94,7 +94,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 username = body_data.get('username')
                 password = body_data.get('password')
                 
-                cursor.execute('INSERT INTO users (username, password) VALUES (%s, %s) RETURNING id, username', 
+                cursor.execute('INSERT INTO users (username, password) VALUES (%s, %s) RETURNING id, username, is_admin', 
                              (username, password))
                 user = cursor.fetchone()
                 conn.commit()
@@ -110,7 +110,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 username = body_data.get('username')
                 password = body_data.get('password')
                 
-                cursor.execute('SELECT id, username FROM users WHERE username = %s AND password = %s', 
+                cursor.execute('SELECT id, username, is_admin FROM users WHERE username = %s AND password = %s', 
                              (username, password))
                 user = cursor.fetchone()
                 
@@ -158,6 +158,48 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     INSERT INTO comments (video_id, user_id, comment_text) 
                     VALUES (%s, %s, %s) RETURNING id
                 ''', (video_id, user_id, comment_text))
+                conn.commit()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'success': True})
+                }
+        
+        elif method == 'DELETE':
+            body_data = json.loads(event.get('body', '{}'))
+            action = body_data.get('action')
+            user_id = body_data.get('user_id')
+            
+            cursor.execute('SELECT is_admin FROM users WHERE id = %s', (user_id,))
+            user = cursor.fetchone()
+            
+            if not user or not user.get('is_admin'):
+                return {
+                    'statusCode': 403,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'error': 'Access denied'})
+                }
+            
+            if action == 'delete_video':
+                video_id = body_data.get('video_id')
+                cursor.execute('DELETE FROM user_reactions WHERE video_id = %s', (video_id,))
+                cursor.execute('DELETE FROM comments WHERE video_id = %s', (video_id,))
+                cursor.execute('DELETE FROM videos WHERE id = %s', (video_id,))
+                conn.commit()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'success': True})
+                }
+            
+            elif action == 'delete_comment':
+                comment_id = body_data.get('comment_id')
+                cursor.execute('DELETE FROM comments WHERE id = %s', (comment_id,))
                 conn.commit()
                 
                 return {
@@ -245,7 +287,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'isBase64Encoded': False,
             'body': json.dumps({'error': f'Invalid input: {str(val_err)}'})
         }
-    except BaseException as e:
+    except Exception as e:
         return {
             'statusCode': 500,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},

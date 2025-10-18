@@ -23,8 +23,18 @@ interface Video {
   youtube_id: string;
   likes: number;
   dislikes: number;
+  views: number;
   created_at: string;
   username: string;
+}
+
+interface UserListItem {
+  id: number;
+  username: string;
+  is_admin: boolean;
+  created_at: string;
+  videos_count: number;
+  comments_count: number;
 }
 
 interface Comment {
@@ -43,7 +53,9 @@ const Index = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [showAuth, setShowAuth] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [showUsers, setShowUsers] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  const [usersList, setUsersList] = useState<UserListItem[]>([]);
   const { toast } = useToast();
 
   const [authForm, setAuthForm] = useState({ username: '', password: '' });
@@ -238,9 +250,59 @@ const Index = () => {
     }
   };
 
-  const openVideo = (video: Video) => {
+  const openVideo = async (video: Video) => {
     setSelectedVideo(video);
     loadComments(video.id);
+    
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'increment_view',
+          video_id: video.id
+        })
+      });
+      
+      setVideos(videos.map(v => v.id === video.id ? { ...v, views: v.views + 1 } : v));
+    } catch (err) {
+      console.error('View increment error:', err);
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      const res = await fetch(`${API_URL}?action=users`);
+      const data = await res.json();
+      setUsersList(data.users || []);
+      setShowUsers(true);
+    } catch (err) {
+      toast({ title: 'Ошибка загрузки пользователей', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!user?.is_admin) return;
+    
+    try {
+      const res = await fetch(API_URL, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_user',
+          user_id: user.id,
+          delete_user_id: userId
+        })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setUsersList(usersList.filter(u => u.id !== userId));
+        toast({ title: 'Пользователь удалён' });
+      }
+    } catch (err) {
+      toast({ title: 'Ошибка удаления', variant: 'destructive' });
+    }
   };
 
   return (
@@ -282,6 +344,10 @@ const Index = () => {
                 </Dialog>
                 
                 <div className="flex items-center gap-3">
+                  <Button onClick={loadUsers} variant="outline" className="bg-white/20 text-white border-white hover:bg-white/30">
+                    <Icon name="Users" size={18} className="mr-2" />
+                    Пользователи
+                  </Button>
                   <span className="text-white font-medium">{user.username}</span>
                   <Button onClick={handleLogout} variant="outline" className="bg-white/20 text-white border-white hover:bg-white/30">
                     Выйти
@@ -356,7 +422,11 @@ const Index = () => {
                   </div>
                   <CardContent className="p-4">
                     <h3 className="font-semibold text-lg mb-2 line-clamp-2">{video.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-3">@{video.username}</p>
+                    <p className="text-sm text-muted-foreground mb-1">@{video.username}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Icon name="Eye" size={14} />
+                      {video.views || 0} просмотров
+                    </p>
                   </CardContent>
                 </div>
                 <div className="px-4 pb-4 flex gap-3">
@@ -412,8 +482,12 @@ const Index = () => {
               
               <div>
                 <h2 className="text-2xl font-bold mb-2">{selectedVideo.title}</h2>
-                <p className="text-muted-foreground">@{selectedVideo.username}</p>
-                <div className="flex gap-3 mt-4">
+                <p className="text-muted-foreground mb-1">@{selectedVideo.username}</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1 mb-4">
+                  <Icon name="Eye" size={16} />
+                  {selectedVideo.views || 0} просмотров
+                </p>
+                <div className="flex gap-3">
                   <Button
                     variant="outline"
                     onClick={() => handleReact(selectedVideo.id, 'like')}
@@ -471,6 +545,52 @@ const Index = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showUsers} onOpenChange={setShowUsers}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Пользователи ФырчТуб</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <div className="space-y-3">
+              {usersList.map((listUser) => (
+                <div key={listUser.id} className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold">@{listUser.username}</p>
+                      {listUser.is_admin && (
+                        <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
+                          ADMIN
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Icon name="Video" size={14} />
+                        {listUser.videos_count} видео
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Icon name="MessageSquare" size={14} />
+                        {listUser.comments_count} комментариев
+                      </span>
+                    </div>
+                  </div>
+                  {user?.is_admin && !listUser.is_admin && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteUser(listUser.id)}
+                    >
+                      <Icon name="Trash2" size={16} className="mr-2" />
+                      Удалить
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

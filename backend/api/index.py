@@ -85,6 +85,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'isBase64Encoded': False,
                     'body': json.dumps({'comments': comments}, default=str)
                 }
+            
+            elif action == 'users':
+                cursor.execute('''
+                    SELECT u.id, u.username, u.is_admin, u.created_at,
+                           COUNT(DISTINCT v.id) as videos_count,
+                           COUNT(DISTINCT c.id) as comments_count
+                    FROM users u
+                    LEFT JOIN videos v ON u.id = v.user_id
+                    LEFT JOIN comments c ON u.id = c.user_id
+                    GROUP BY u.id, u.username, u.is_admin, u.created_at
+                    ORDER BY u.created_at DESC
+                ''', ())
+                users = cursor.fetchall()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'users': users}, default=str)
+                }
         
         elif method == 'POST':
             body_data = json.loads(event.get('body', '{}'))
@@ -166,6 +186,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'isBase64Encoded': False,
                     'body': json.dumps({'success': True})
                 }
+            
+            elif action == 'increment_view':
+                video_id = body_data.get('video_id')
+                cursor.execute('UPDATE videos SET views = views + 1 WHERE id = %s', (video_id,))
+                conn.commit()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'success': True})
+                }
         
         elif method == 'DELETE':
             body_data = json.loads(event.get('body', '{}'))
@@ -200,6 +232,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             elif action == 'delete_comment':
                 comment_id = body_data.get('comment_id')
                 cursor.execute('DELETE FROM comments WHERE id = %s', (comment_id,))
+                conn.commit()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'isBase64Encoded': False,
+                    'body': json.dumps({'success': True})
+                }
+            
+            elif action == 'delete_user':
+                delete_user_id = body_data.get('delete_user_id')
+                cursor.execute('DELETE FROM user_reactions WHERE user_id = %s', (delete_user_id,))
+                cursor.execute('DELETE FROM comments WHERE user_id = %s', (delete_user_id,))
+                cursor.execute('DELETE FROM videos WHERE user_id = %s', (delete_user_id,))
+                cursor.execute('DELETE FROM users WHERE id = %s', (delete_user_id,))
                 conn.commit()
                 
                 return {

@@ -403,7 +403,7 @@ const Index = () => {
           <div className="text-center py-20">
             <Icon name="VideoOff" size={64} className="mx-auto text-muted-foreground mb-4" />
             <h2 className="text-2xl font-semibold mb-2">Пока нет видео</h2>
-            <p className="text-muted-foreground">Станьте первым, кто загрузит видео!</p>
+            <p className="text-muted-foreground">Станьте первонахом, кто загрузит видео!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
